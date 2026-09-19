@@ -86,6 +86,25 @@ def market_paths(value, name):
     return found
 
 
+def tracked_blobs(output):
+    """Compare repository content, independent of Windows checkout EOL conversion."""
+    values = output.splitlines()
+    require(len(values) == len(SHARED) and all(re.fullmatch(r'[0-9a-f]{40}', v) for v in values),
+            'Invalid tracked distribution blob identities')
+    return dict(zip(SHARED, values))
+
+
+def loaded_skill(detail, name):
+    """Plugin skills are namespace-qualified by the native Codex loader."""
+    require(detail['summary']['installed'] and detail['summary']['enabled'], 'Codex plugin not installed/enabled')
+    require(not detail['apps'] and not detail['mcpServers'] and not detail['hooks'], 'Unexpected executable plugin components')
+    skills = detail['skills']
+    require(len(skills) == 1 and skills[0]['name'] == f'{name}:{name}',
+            f'Unexpected Codex skill names: {[s.get("name") for s in skills]}')
+    require(skills[0]['enabled'] and isinstance(skills[0].get('path'), str), 'Codex skill disabled or missing path')
+    return skills[0]
+
+
 @contextmanager
 def app_server(executable, env, cwd):
     process = subprocess.Popen([executable, '--enable', 'plugins', 'app-server'],
@@ -180,7 +199,9 @@ def smoke(root, host, data, entries, report):
             expected = inventory(source / '.agents/skills' / name)
             snapshots[name] = expected
             report['sources'][name] = {'sha': sha, 'version': manifests[0]['version'], 'inventory': expected}
-            shared[name] = {p: hashlib.sha256((source / p).read_bytes()).hexdigest() for p in SHARED}
+            shared[name] = tracked_blobs(run('git', '-C', str(source), 'rev-parse',
+                                             *[f'HEAD:{p}' for p in SHARED]))
+            report['sources'][name]['distribution_git_blobs'] = shared[name]
             run('npx', '--yes', 'skills@latest', 'add', f'idnotbe/{name}', '--skill', name,
                 '--agent', 'codex', 'claude-code', '--copy', '--yes')
             for folder in ('.agents', '.claude'):
@@ -215,10 +236,8 @@ def smoke(root, host, data, entries, report):
                     result = call('plugin/install', params)
                     require(result['appsNeedingAuth'] == [], 'Skills-only plugin unexpectedly requires app authentication')
                     detail = call('plugin/read', params)['plugin']
-                    require(detail['summary']['installed'] and detail['summary']['enabled'], 'Codex plugin not installed/enabled')
-                    require(not detail['apps'] and not detail['mcpServers'] and not detail['hooks'], 'Unexpected executable plugin components')
-                    require(len(detail['skills']) == 1 and detail['skills'][0]['name'] == name, 'Codex did not discover the expected skill')
-                    skill_path = Path(detail['skills'][0]['path'])
+                    skill = loaded_skill(detail, name)
+                    skill_path = Path(skill['path'])
                     require(inventory(skill_path.parent) == snapshots[name], f'Codex plugin bundle drift: {name}')
                     report['checks'].append(f'{name}:codex-preview-read-install-integrity')
             report['codex_api_status'] = 'development_only_not_a_production_client'

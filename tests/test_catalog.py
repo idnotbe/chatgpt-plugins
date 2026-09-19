@@ -62,6 +62,34 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(catalog.market_paths(response, 'target'), ['/actual path'])
         self.assertEqual(catalog.market_paths(response, 'unknown'), [])
 
+    def test_tracked_content_identity_validation(self):
+        values = ['a' * 40, 'b' * 40, 'c' * 40]
+        expected = dict(zip(catalog.SHARED, values))
+        self.assertEqual(catalog.tracked_blobs('\n'.join(values)), expected)
+        self.assertEqual(catalog.tracked_blobs('\r\n'.join(values)), expected)
+        for invalid in ('', 'a' * 40, '\n'.join(values + ['d' * 40]), 'bad\nbad\nbad'):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                catalog.tracked_blobs(invalid)
+
+    def test_codex_plugin_skill_namespace_and_state(self):
+        detail = {'summary': {'installed': True, 'enabled': True}, 'apps': [],
+                  'mcpServers': [], 'hooks': [],
+                  'skills': [{'name': 'deep-inquiry:deep-inquiry', 'enabled': True, 'path': '/plugin/SKILL.md'}]}
+        self.assertEqual(catalog.loaded_skill(detail, 'deep-inquiry')['path'], '/plugin/SKILL.md')
+        for name in ('deep-inquiry', 'other:deep-inquiry', 'deep-inquiry:other'):
+            changed = copy.deepcopy(detail)
+            changed['skills'][0]['name'] = name
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                catalog.loaded_skill(changed, 'deep-inquiry')
+        for mutate in (lambda x: x['skills'].append(copy.deepcopy(x['skills'][0])),
+                       lambda x: x['skills'][0].update(enabled=False),
+                       lambda x: x['summary'].update(installed=False),
+                       lambda x: x['hooks'].append('unexpected')):
+            changed = copy.deepcopy(detail)
+            mutate(changed)
+            with self.assertRaises(ValueError):
+                catalog.loaded_skill(changed, 'deep-inquiry')
+
     def test_missing_and_modified_bundle_detected(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
