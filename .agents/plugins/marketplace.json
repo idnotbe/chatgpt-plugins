@@ -1,0 +1,44 @@
+{
+  "name": "idnotbe-chatgpt-plugins",
+  "interface": {
+    "displayName": "idnotbe Skills"
+  },
+  "plugins": [
+    {
+      "name": "deep-inquiry",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/idnotbe/deep-inquiry.git"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "skill-quality-builder",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/idnotbe/skill-quality-builder.git"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "vibe-check",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/idnotbe/vibe-check.git"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
